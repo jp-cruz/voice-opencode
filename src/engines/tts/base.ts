@@ -1,4 +1,5 @@
 export interface TTSEngine {
+  initialize(): Promise<void>;
   speak(text: string): Promise<void>;
   stop(): void;
   pause(): void;

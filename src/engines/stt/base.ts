@@ -1,4 +1,5 @@
 export interface STTEngine {
+  initialize(): Promise<void>;
   transcribe(audioBuffer: ArrayBuffer): Promise<string>;
   start(): Promise<void>;
   stop(): void;
