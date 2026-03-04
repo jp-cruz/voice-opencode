@@ -200,3 +200,18 @@ This project is licensed under AGPLv3. See [LICENSE](LICENSE) for details.
 ## Attribution
 
 This project includes attribution to John Paul "Jp" Cruz. See [LICENSE](LICENSE) for details.
+
+### Project Dependencies
+
+**OpenCode** - This project interacts with and extends [OpenCode](https://github.com/sst/opencode), an AI coding agent built by SST. Voice OpenCode is not affiliated with or endorsed by SST.
+
+**Zen** - Inspired by the [Zen](https://github.com/sst/zen) project from SST, which provides a beautiful terminal interface for OpenCode.
+
+**Big Pickle Model** - This project was conceptualized and developed with assistance from the Big Pickle AI model. The Big Pickle model is an AI coding assistant that helps developers build software.
+
+### Third-Party Libraries
+
+This project uses the following open-source libraries:
+- [Bun](https://bun.sh/) - JavaScript runtime
+- [OpenAI](https://openai.com/) - Whisper API for speech-to-text
+- [Microsoft Edge TTS](https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/text-to-speech) - Text-to-speech engine
