@@ -6,6 +6,12 @@ import type { TTSEngine, TTSConfig, TTSVoice } from './base.js';
 
 export type { TTSEngine, TTSConfig, TTSVoice } from './base.js';
 
+function sanitizeText(input: string): string {
+  return input
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    .slice(0, 10000);
+}
+
 export class EdgeTTSEngine implements TTSEngine {
   private config: TTSConfig;
   private currentVoice: string;
@@ -29,41 +35,53 @@ export class EdgeTTSEngine implements TTSEngine {
     this.speaking = true;
     
     try {
-      await this.speakDirect(text);
+      const safeText = sanitizeText(text);
+      await this.speakViaStdin(safeText);
     } finally {
       this.speaking = false;
     }
   }
 
-  private async speakDirect(text: string): Promise<void> {
+  private async speakViaStdin(text: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const rateValue = Math.round((this.rate - 1) * 10);
       const volumeValue = Math.round(this.volume * 100);
-      const escapedText = text.replace(/'/g, "''").replace(/"/g, '`"');
       
       const psScript = `
-        Add-Type -AssemblyName System.Speech
-        $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
-        $synth.Rate = ${rateValue}
-        $synth.Volume = ${volumeValue}
-        $synth.Speak('${escapedText}')
-      `;
+Add-Type -AssemblyName System.Speech
+$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$synth.Rate = ${rateValue}
+$synth.Volume = ${volumeValue}
+$text = Get-Content -Path $(
+$inputPath = [System.IO.Path]::GetTempFileName()
+[System.IO.File]::WriteAllText($inputPath, $(
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes(@'
+${text.replace(/'/g, "''")}
+'@)
+  [System.Convert]::ToBase64String($bytes)
+), 'Base64')
+$inputPath
+) -Encoding Byte -AsBase64String | ForEach-Object { [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_)) }
+$synth.Speak($text)
+Remove-Item $inputPath -ErrorAction SilentlyContinue
+`;
 
-      const proc = spawn('powershell', ['-Command', psScript]);
+      const proc = spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', psScript]);
+
+      let stderr = '';
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
 
       proc.on('close', (code) => {
         if (code === 0) {
           resolve();
         } else {
-          reject(new Error(`TTS failed with code ${code}`));
+          reject(new Error(`TTS failed with code ${code}: ${stderr}`));
         }
       });
 
       proc.on('error', reject);
-      
-      setTimeout(() => {
-        resolve();
-      }, 5000);
     });
   }
 
@@ -79,11 +97,11 @@ export class EdgeTTSEngine implements TTSEngine {
   }
 
   setRate(rate: number): void {
-    this.rate = rate;
+    this.rate = Math.max(0.5, Math.min(2.0, rate));
   }
 
   setVolume(volume: number): void {
-    this.volume = volume;
+    this.volume = Math.max(0.0, Math.min(1.0, volume));
   }
 
   isSpeaking(): boolean {
@@ -127,6 +145,7 @@ export class ElevenLabsTTSEngine implements TTSEngine {
       throw new Error('ElevenLabs API key required');
     }
 
+    const safeText = sanitizeText(text);
     this.speaking = true;
 
     try {
@@ -137,7 +156,7 @@ export class ElevenLabsTTSEngine implements TTSEngine {
           'xi-api-key': this.apiKey,
         },
         body: JSON.stringify({
-          text,
+          text: safeText,
           model_id: 'eleven_monolingual_v1',
           voice_settings: {
             stability: 0.5,
@@ -163,7 +182,7 @@ export class ElevenLabsTTSEngine implements TTSEngine {
 
   private async playAudio(filePath: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const proc = spawn('powershell', ['-Command', `(New-Object System.Media.SoundPlayer '${filePath}').PlaySync()`]);
+      const proc = spawn('powershell', ['-NoProfile', '-Command', `(New-Object System.Media.SoundPlayer '${filePath}').PlaySync()`]);
       
       proc.on('close', (code) => {
         if (code === 0) {
@@ -189,11 +208,11 @@ export class ElevenLabsTTSEngine implements TTSEngine {
   }
 
   setRate(rate: number): void {
-    this.rate = rate;
+    this.rate = Math.max(0.5, Math.min(2.0, rate));
   }
 
   setVolume(volume: number): void {
-    this.volume = volume;
+    this.volume = Math.max(0.0, Math.min(1.0, volume));
   }
 
   isSpeaking(): boolean {

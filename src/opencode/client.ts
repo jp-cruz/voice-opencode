@@ -29,6 +29,13 @@ export class OpenCodeClient {
     if (config.sessionId) {
       this.sessionId = config.sessionId;
     }
+    this.warnIfInsecure();
+  }
+
+  private warnIfInsecure(): void {
+    if (this.url.startsWith('http://') && !this.url.includes('localhost') && !this.url.includes('127.0.0.1')) {
+      console.warn('[SECURITY] WARNING: Using HTTP connection. Your data may be transmitted unencrypted. Consider using HTTPS.');
+    }
   }
 
   async createSession(): Promise<string> {
@@ -99,13 +106,13 @@ export class OpenCodeClient {
     };
   }
 
-  private handleMessage(data: any): void {
+  private handleMessage(data: Record<string, unknown>): void {
     const message: OpenCodeMessage = {
-      type: data.type || 'text',
-      content: data.content || data.text,
-      tool: data.tool,
-      toolInput: data.toolInput,
-      toolOutput: data.toolOutput,
+      type: (data.type as OpenCodeMessage['type']) || 'text',
+      content: (data.content as string) || (data.text as string),
+      tool: data.tool as string,
+      toolInput: data.toolInput as string,
+      toolOutput: data.toolOutput as string,
     };
 
     for (const handler of this.messageHandlers) {
