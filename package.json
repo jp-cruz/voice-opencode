@@ -1,0 +1,30 @@
+{
+  "name": "voice-opencode",
+  "version": "0.1.0",
+  "description": "Cross-platform voice interaction layer for OpenCode AI coding agent",
+  "type": "module",
+  "private": true,
+  "main": "src/cli/index.ts",
+  "scripts": {
+    "start": "bun run src/cli/index.ts",
+    "dev": "bun --watch run src/cli/index.ts",
+    "test": "bun test",
+    "test:stt": "bun run scripts/test-stt.ts",
+    "test:tts": "bun run scripts/test-tts.ts",
+    "lint": "bun run eslint",
+    "build": "bun build src/cli/index.ts --outdir=dist --target=bun"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "openai": "^4.77.0",
+    "eventsource": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/eventsource": "^1.1.15",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
