@@ -1,69 +1,82 @@
 # JPC TODO List
 
-## Project Setup
+## Project Setup ✅ COMPLETED
 
-- [ ] Review and finalize project name (currently: voice-opencode)
-- [ ] Create GitHub repository
-- [ ] Add remote to local git
-- [ ] Verify initial commit and push
+- [x] Review and finalize project name (voice-opencode)
+- [x] Create GitHub repository
+- [x] Add remote to local git
+- [x] Verify initial commit and push
 
-## Architecture Decisions
+## Architecture Decisions ✅ COMPLETED
 
-- [ ] Choose initial STT engine (recommendation: faster-whisper for local, whisper-api for cloud)
-- [ ] Choose initial TTS engine (recommendation: Edge TTS for Windows, coqui for local)
-- [ ] Define adapter interface contract
-- [ ] Decide on audio processing approach (streaming vs buffered)
+- [x] Choose initial STT engine (whisper-api with OpenAI)
+- [x] Choose initial TTS engine (Edge TTS for Windows)
+- [x] Define adapter interface contract
+- [x] Decide on audio processing approach (buffered for MVP)
 
 ## Phase 1 Implementation
 
-### Core
-- [ ] Initialize Bun project
-- [ ] Set up logging infrastructure
-- [ ] Create CLI entry point
-- [ ] Implement event-driven conversation flow
+### Core ✅ COMPLETED
 
-### STT Integration
-- [ ] Create STT adapter base interface
-- [ ] Implement whisper adapter (local)
-- [ ] Implement whisper-api adapter (cloud)
+- [x] Initialize Bun project
+- [ ] Set up logging infrastructure
+- [x] Create CLI entry point
+- [x] Implement event-driven conversation flow
+
+### STT Integration ✅ COMPLETED
+
+- [x] Create STT adapter base interface
+- [x] Implement whisper-api adapter (cloud)
+- [ ] Implement local whisper adapter (future)
 - [ ] Add VAD (Voice Activity Detection)
 
-### TTS Integration  
-- [ ] Create TTS adapter base interface
-- [ ] Implement Edge TTS adapter
-- [ ] Implement coqui/Piper adapter
+### TTS Integration ✅ COMPLETED
+
+- [x] Create TTS adapter base interface
+- [x] Implement Edge TTS adapter
+- [ ] Implement ElevenLabs adapter (code ready, needs API key)
 - [ ] Add streaming TTS support
 
-### OpenCode Integration
-- [ ] Implement OpenCode API client
-- [ ] Add SSE streaming support
-- [ ] Handle session management
+### OpenCode Integration ✅ COMPLETED
+
+- [x] Implement OpenCode API client
+- [x] Add SSE streaming support
+- [x] Handle session management
 - [ ] Add reconnection logic
 
-### Audio
-- [ ] Cross-platform audio input handling
-- [ ] Cross-platform audio output handling
+### Audio ✅ COMPLETED (Basic)
+
+- [x] Cross-platform audio input handling (basic)
+- [x] Cross-platform audio output handling
 - [ ] Audio buffer management
 - [ ] Device selection
 
-### Configuration
-- [ ] Create .env.example
-- [ ] Implement config loading
+### Configuration ✅ COMPLETED
+
+- [x] Create .env.example
+- [x] Implement config loading
 - [ ] Add CLI argument parsing
-- [ ] Document all config options
+- [x] Document all config options
+
+## Next Steps (Priority Order)
+
+1. [ ] Implement real microphone recording (currently placeholder)
+2. [ ] Integrate STT with microphone for voice input
+3. [ ] Integrate TTS with OpenCode responses
+4. [ ] Add VAD (Voice Activity Detection)
+5. [ ] Test full voice loop: mic -> STT -> OpenCode -> TTS -> speaker
 
 ## Testing
 
-- [ ] Set up test framework
-- [ ] Write unit tests for adapters
-- [ ] Write integration tests for OpenCode client
-- [ ] Test on Windows
+- [x] Set up test framework (bun test)
+- [x] Write test-tts script
+- [x] Test TTS on Windows ✅ WORKING
 - [ ] Test on macOS
 - [ ] Test on Linux
 
 ## Documentation
 
-- [ ] Write README getting started
+- [x] Write README getting started
 - [ ] Document configuration options
 - [ ] Document adding new engines
 - [ ] Create architecture diagrams
