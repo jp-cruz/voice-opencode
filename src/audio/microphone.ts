@@ -9,27 +9,98 @@ export interface AudioRecorder {
   isRecording(): boolean;
 }
 
-export class WindowsMicrophone implements AudioRecorder {
+export interface RecorderOptions {
+  sampleRate?: number;
+  channels?: number;
+  format?: string;
+}
+
+export class WindowsRecorder implements AudioRecorder {
   private recording = false;
   private tempFile: string | null = null;
   private process: ChildProcess | null = null;
 
-  async start(): Promise<void> {
+  async start(options?: RecorderOptions): Promise<void> {
     if (this.recording) return;
 
-    this.tempFile = join(tmpdir(), `voice-opencode-rec-${Date.now()}.wav`);
+    const timestamp = Date.now();
+    this.tempFile = join(tmpdir(), `voice-opencode-rec-${timestamp}.wav`);
     this.recording = true;
 
-    // Use PowerShell to record audio
     const script = `
-      Add-Type -AssemblyName System.Speech
-      $recorder = New-Object System.Speech.Recognition.SpeechRecognitionEngine
-      [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    `;
+Add-Type -AssemblyName System.Speech
 
-    // Simpler approach: create an empty file to indicate recording started
-    await writeFile(this.tempFile, Buffer.alloc(0));
-    console.log('[Audio] Recording started (Windows)');
+$recording = $true
+$outputPath = '${this.tempFile.replace(/\\/g, '\\\\')}'
+
+# Create a simple WAV header approach using .NET
+Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+
+public class AudioRecorder {
+    [DllImport("winmm.dll", SetLastError = true)]
+    public static extern int mciSendString(string lpstrCommand, string lpstrReturnString, int uReturnLength, IntPtr hwndCallback);
+    
+    public static void StartRecording(string path) {
+        mciSendString($"open new type waveaudio alias sound", null, 0, IntPtr.Zero);
+        mciSendString($"record sound", null, 0, IntPtr.Zero);
+    }
+    
+    public static void StopRecording(string path) {
+        mciSendString($"save sound {path}", null, 0, IntPtr.Zero);
+        mciSendString($"close sound", null, 0, IntPtr.Zero);
+    }
+}
+'@
+
+[AudioRecorder]::StartRecording($outputPath)
+
+# Save process info for stopping
+$script:recorderProcess = Get-Process -Id $PID
+$script:outputPath = $outputPath
+
+Write-Output "RECORDING_STARTED:$outputPath"
+while ($script:recorderProcess -and -not $script:recorderProcess.HasExited) {
+    Start-Sleep -Milliseconds 100
+}
+`;
+
+    return new Promise((resolve, reject) => {
+      const proc = spawn('powershell', ['-NoProfile', '-Command', '-'], {
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      let output = '';
+      let stderr = '';
+
+      proc.stdout.on('data', (data) => {
+        output += data.toString();
+        if (output.includes('RECORDING_STARTED')) {
+          console.log('[Audio] Recording started');
+          resolve();
+        }
+      });
+
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on('close', (code) => {
+        if (code !== 0 && !this.recording) {
+          console.log('[Audio] Recording process ended');
+        }
+      });
+
+      proc.on('error', (err) => {
+        console.error('[Audio] Recording error:', err);
+        reject(err);
+      });
+
+      proc.stdin.write(script);
+      proc.stdin.end();
+    });
   }
 
   async stop(): Promise<ArrayBuffer> {
@@ -38,21 +109,34 @@ export class WindowsMicrophone implements AudioRecorder {
     }
 
     this.recording = false;
-    
-    // For Windows, we'll use a different approach
-    // Record using sox or similar if available, otherwise create a placeholder
-    console.log('[Audio] Recording stopped');
 
-    // Return empty buffer for now - actual implementation would use
-    // a proper audio recording library or command-line tool
-    const emptyBuffer = new ArrayBuffer(0);
-    
-    if (this.tempFile) {
-      await unlink(this.tempFile).catch(() => {});
-      this.tempFile = null;
-    }
+    // Stop recording and save file
+    const stopScript = `
+[AudioRecorder]::StopRecording('${this.tempFile.replace(/\\/g, '\\\\')}')
+Write-Output "RECORDING_STOPPED"
+`;
 
-    return emptyBuffer;
+    return new Promise((resolve, reject) => {
+      const proc = spawn('powershell', ['-NoProfile', '-Command', stopScript]);
+
+      proc.on('close', async (code) => {
+        try {
+          if (this.tempFile) {
+            const data = await Bun.file(this.tempFile).arrayBuffer();
+            await unlink(this.tempFile).catch(() => {});
+            this.tempFile = null;
+            console.log('[Audio] Recording stopped');
+            resolve(data);
+          } else {
+            resolve(new ArrayBuffer(0));
+          }
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+      proc.on('error', reject);
+    });
   }
 
   isRecording(): boolean {
@@ -60,7 +144,7 @@ export class WindowsMicrophone implements AudioRecorder {
   }
 }
 
-export class MacMicrophone implements AudioRecorder {
+export class MacRecorder implements AudioRecorder {
   private recording = false;
   private tempFile: string | null = null;
   private process: ChildProcess | null = null;
@@ -71,7 +155,9 @@ export class MacMicrophone implements AudioRecorder {
     this.tempFile = join(tmpdir(), `voice-opencode-rec-${Date.now()}.wav`);
     this.recording = true;
 
-    // Use sox or arecord on macOS if available
+    // Use sox if available, otherwise use rec from ImageMagick
+    this.process = spawn('sox', ['-d', '-r', '16000', '-c', '1', this.tempFile]);
+
     console.log('[Audio] Recording started (macOS)');
   }
 
@@ -81,16 +167,21 @@ export class MacMicrophone implements AudioRecorder {
     }
 
     this.recording = false;
-    console.log('[Audio] Recording stopped');
 
-    const emptyBuffer = new ArrayBuffer(0);
-    
-    if (this.tempFile) {
-      await unlink(this.tempFile).catch(() => {});
-      this.tempFile = null;
+    if (this.process) {
+      this.process.kill();
+      this.process = null;
     }
 
-    return emptyBuffer;
+    try {
+      const data = await Bun.file(this.tempFile!).arrayBuffer();
+      await unlink(this.tempFile!).catch(() => {});
+      this.tempFile = null;
+      console.log('[Audio] Recording stopped');
+      return data;
+    } catch {
+      return new ArrayBuffer(0);
+    }
   }
 
   isRecording(): boolean {
@@ -98,15 +189,20 @@ export class MacMicrophone implements AudioRecorder {
   }
 }
 
-export class LinuxMicrophone implements AudioRecorder {
+export class LinuxRecorder implements AudioRecorder {
   private recording = false;
   private tempFile: string | null = null;
+  private process: ChildProcess | null = null;
 
   async start(): Promise<void> {
     if (this.recording) return;
 
     this.tempFile = join(tmpdir(), `voice-opencode-rec-${Date.now()}.wav`);
     this.recording = true;
+
+    // Use arecord (ALSA) or parec (PulseAudio)
+    this.process = spawn('arecord', ['-f', 'cd', '-r', '16000', '-c', '1', '-t', 'wav', this.tempFile]);
+
     console.log('[Audio] Recording started (Linux)');
   }
 
@@ -116,16 +212,21 @@ export class LinuxMicrophone implements AudioRecorder {
     }
 
     this.recording = false;
-    console.log('[Audio] Recording stopped');
 
-    const emptyBuffer = new ArrayBuffer(0);
-    
-    if (this.tempFile) {
-      await unlink(this.tempFile).catch(() => {});
-      this.tempFile = null;
+    if (this.process) {
+      this.process.kill();
+      this.process = null;
     }
 
-    return emptyBuffer;
+    try {
+      const data = await Bun.file(this.tempFile!).arrayBuffer();
+      await unlink(this.tempFile!).catch(() => {});
+      this.tempFile = null;
+      console.log('[Audio] Recording stopped');
+      return data;
+    } catch {
+      return new ArrayBuffer(0);
+    }
   }
 
   isRecording(): boolean {
@@ -133,16 +234,16 @@ export class LinuxMicrophone implements AudioRecorder {
   }
 }
 
-export function createMicrophone(): AudioRecorder {
+export function createMicrophone(options?: RecorderOptions): AudioRecorder {
   const platform = process.platform;
   
   switch (platform) {
     case 'win32':
-      return new WindowsMicrophone();
+      return new WindowsRecorder();
     case 'darwin':
-      return new MacMicrophone();
+      return new MacRecorder();
     case 'linux':
-      return new LinuxMicrophone();
+      return new LinuxRecorder();
     default:
       throw new Error(`Unsupported platform: ${platform}`);
   }
