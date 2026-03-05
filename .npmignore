@@ -1,0 +1,11 @@
+node_modules/
+src/
+*.ts
+*.tsx
+*.md
+.gitignore
+.gitlab-ci.yml
+.github/
+coverage/
+.bak
+*.log

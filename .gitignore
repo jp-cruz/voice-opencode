@@ -1,0 +1,14 @@
+jpc-todos.md
+memory.md
+# Build output
+dist/
+# Dependencies
+env/
+# Local environment files
+
+# IDE/editor files
+.vscode/
+# Logs
+node_modules/
+npm-debug.log
+yarn-debug.log
