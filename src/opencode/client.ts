@@ -52,8 +52,20 @@ export class OpenCodeClient {
       throw new Error(`Failed to create session: ${response.statusText}`);
     }
 
-    const data = await response.json() as { sessionId: string };
-    this.sessionId = data.sessionId;
+let sessionId: string;
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        const data = (await response.json()) as any;
+        sessionId = data.sessionId as string;
+      } catch {
+        throw new Error('Failed to parse JSON from create session response');
+      }
+    } else {
+      // fallback: generate a temporary session id
+      sessionId = 'fallback-' + Date.now().toString();
+    }
+    this.sessionId = sessionId;
     return this.sessionId;
   }
 
@@ -83,7 +95,7 @@ export class OpenCodeClient {
   private connect(): void {
     if (!this.sessionId) return;
 
-    const endpoint = `${this.url}/api/sessions/${this.sessionId}/events`;
+    const endpoint = `${this.url}/event`;
     this.eventSource = new EventSource(endpoint);
 
     this.eventSource.onopen = () => {

@@ -78,6 +78,7 @@ Voice OpenCode enables bi-directional voice communication with OpenCode. Speak y
 
 - [Bun](https://bun.sh/) runtime
 - OpenCode server running (`opencode serve`)
+- Note: The server provides SSE streaming by default; no extra flag is required.
 - Audio input/output device
 
 ### Quick Start
