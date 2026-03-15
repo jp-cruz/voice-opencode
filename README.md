@@ -1,4 +1,4 @@
-# Voice OpenCode
+# Voice OpenCode - Development on Hold see [LegionForge](https://github.com/jp-cruz/LegionForge) or https://legionforge.org
 
 A cross-platform voice interaction layer for OpenCode AI coding agent.
 
